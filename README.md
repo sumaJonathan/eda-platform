@@ -1,7 +1,7 @@
 
 # Unified EDA Platform
 
-![CI](https://github.com/<your-username>/eda-platform/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/sumaJonathan/eda-platform/actions/workflows/ci.yml/badge.svg)
 
 A platform that meshes analog simulation, digital simulation, PCB
 design, and custom IC layout on one shared design database.
