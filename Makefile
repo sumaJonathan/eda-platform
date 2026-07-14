@@ -10,7 +10,7 @@ help:
 	@echo "  clean  - remove build/test caches"
 
 setup:
-	cd proto && uv pip install -e ".[dev]"
+	cd proto && uv venv && uv pip install -e ".[dev]"
 	cd core && cargo fetch
 
 fmt:
