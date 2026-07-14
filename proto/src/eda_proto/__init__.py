@@ -1,3 +1,4 @@
+import os
 """eda_proto - Python prototypes for the Unified EDA Platform."""
 
 __version__ = "0.0.1"
