@@ -21,3 +21,13 @@ def nets_on_instance_set(
         if net_id is not None:
             nets.add(net_id)
     return nets
+
+
+def neighbors(design: Design, view: SchematicView, instance_id: InstanceId) -> set[InstanceId]:
+    """Which instances share a net with the given one? (electrical adjacency)"""
+    result: set[InstanceId] = set()
+    for net_id in nets_on_instance_set(design, view, instance_id):
+        for instance in instances_on_net(view, net_id):
+            result.add(instance)
+    result.discard(instance_id)  # remove the reference instance
+    return result

@@ -34,6 +34,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "--import-mode=importlib"
 
 [tool.mypy]
 files = ["src", "tests"]
