@@ -174,6 +174,59 @@ def disconnect(design: Design, view: SchematicView, ipin: InstancePin) -> None:
     _detach(view, ipin)
 
 
+def merge_nets(design: Design, view: SchematicView, keep: NetId, drop: NetId) -> None:
+    """Fuse net 'drop' into net 'keep'. After this, 'drop' no longer exists,
+    and all its pins are on 'keep'.
+    """
+    # validate both nets exist in this view
+    if keep not in view.nets:
+        raise ValueError(f"no net with ID {keep} in this view")
+    if drop not in view.nets:
+        raise ValueError(f"no net with ID {drop} in this view")
+    if keep == drop:
+        return  # nothing to do
+
+    # move all pins from drop to keep
+    drop_net = view.nets[drop]
+    for ipin in list(drop_net.pins):
+        view.nets[keep].pins.add(ipin)  # set aside
+        view.pin_to_net[ipin] = keep  # rewrite index
+    # delete the now-empty drop net
+    del view.nets[drop]
+
+
+def split_net(
+    design: Design, view: SchematicView, net_id: NetId, pins_to_move: set[InstancePin]
+) -> NetId:
+    """Peel a subset of pins off net_id onto a new net. Returns new net's ID.
+    Choice of split: user decides which pins form the new group assuming there's
+    no wire topology to decide for them. Phase 2 with use wire-graph connectivity
+    to compute pins_to_move automatically. For now, it's supplied.
+    """
+    # validate net exists
+    if net_id not in view.nets:
+        raise ValueError(f"no net with ID {net_id} in this view")
+    # validate pins_to_move is non-empty
+    if not pins_to_move:
+        raise ValueError("pins_to_move cannot be empty")
+    # validate pins_to_move are all on net_id
+    for pin in pins_to_move:
+        if view.pin_to_net.get(pin) != net_id:
+            raise ValueError(f"pin {pin} is not on net {net_id}")
+    # validate pins_to_move ALL of the net's pins
+    remaining = view.nets[net_id].pins - pins_to_move  # set difference
+    if not remaining:
+        raise ValueError(f"split will leave net {net_id} empty; not a proper split")
+    # create new net
+    new_net_id = create_net(design, view)  # anonymous; caller can name later
+    # move pins to new net
+    for pin in pins_to_move:
+        _detach(view, pin)
+        _attach(view, pin, new_net_id)
+
+    return new_net_id
+
+
 def pins_on_net(view: SchematicView, net_id: NetId) -> frozenset[InstancePin]:
     """Every pin wired to net_id. The query from the Done-when line."""
     return frozenset(view.nets[net_id].pins)

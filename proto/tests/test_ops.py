@@ -24,50 +24,13 @@ from eda_proto.ops import (
     delete_instance,
     disconnect,
     ipin,
+    merge_nets,
     nets_on_instance,
     pins_on_net,
 )
-
-
-def scaffold() -> tuple[Design, SchematicView, SimpleNamespace]:
-    """A library (resistor, vsource) plus an empty 'divider' schematic view."""
-    d = Design()
-    res = add_cell(d, "resistor", [("a", Direction.PASSIVE), ("b", Direction.PASSIVE)])
-    vsrc = add_cell(d, "vsource", [("p", Direction.PASSIVE), ("n", Direction.PASSIVE)])
-    top = add_cell(d, "divider", [])
-    d.top = top
-    sch = SchematicView(owner=top, instances={}, nets={}, pin_to_net={}, port_map={})
-    d.library[top].views["schematic"] = sch
-    return d, sch, SimpleNamespace(res=res, vsrc=vsrc, top=top)
-
-
-def wired_divider() -> tuple[Design, SchematicView, SimpleNamespace]:
-    """The fully wired voltage divider, built entirely through ops."""
-    d, sch, ids = scaffold()
-    v1 = add_instance(d, sch, ids.vsrc, "V1")
-    r1 = add_instance(d, sch, ids.res, "R1")
-    r2 = add_instance(d, sch, ids.res, "R2")
-    vin = create_net(d, sch, "vin")
-    out = create_net(d, sch, "out")
-    gnd = create_net(d, sch, "gnd")
-    connect(d, sch, ipin(d, sch, v1, "p"), vin)
-    connect(d, sch, ipin(d, sch, r1, "a"), vin)
-    connect(d, sch, ipin(d, sch, r1, "b"), out)
-    connect(d, sch, ipin(d, sch, r2, "a"), out)
-    connect(d, sch, ipin(d, sch, r2, "b"), gnd)
-    connect(d, sch, ipin(d, sch, v1, "n"), gnd)
-    h = SimpleNamespace(
-        res=ids.res,
-        vsrc=ids.vsrc,
-        top=ids.top,
-        V1=v1,
-        R1=r1,
-        R2=r2,
-        vin=vin,
-        out=out,
-        gnd=gnd,
-    )
-    return d, sch, h
+from eda_proto.oracle import recompute_index
+from eda_proto.queries import instances_on_net
+from tests.helpers import scaffold, wired_divider
 
 
 # ==========================================================================
@@ -408,3 +371,59 @@ def test_disconnect_then_reconnect_round_trips() -> None:
     connect(d, sch, p, h.vin)
     assert nets_on_instance(d, sch, h.R1)[p.pin] == h.vin
     check_invariants(d)
+
+
+# ==========================================================================
+# Merging two nets (Phase 1.2)
+# ==========================================================================
+def two_nets_to_merge() -> tuple[Design, SchematicView, SimpleNamespace]:
+    """Two nets, each with one pin, ready to be merged."""
+    d, sch, ids = scaffold()
+    r1 = add_instance(d, sch, ids.res, "R1")
+    r2 = add_instance(d, sch, ids.res, "R2")
+    a = create_net(d, sch, "a")
+    b = create_net(d, sch, "b")
+    connect(d, sch, ipin(d, sch, r1, "a"), a)
+    connect(d, sch, ipin(d, sch, r2, "a"), b)
+    h = SimpleNamespace(
+        res=ids.res,
+        top=ids.top,
+        R1=r1,
+        R2=r2,
+        a=a,
+        b=b,
+    )
+    return d, sch, h
+
+
+def test_merge_fuses_two_nets() -> None:
+    d, sch, h = two_nets_to_merge()
+    merge_nets(d, sch, h.a, h.b)  # fuse the nets
+
+    # both pins now on 'a','b' is gone
+    assert pins_on_net(sch, h.a) == {ipin(d, sch, h.R1, "a"), ipin(d, sch, h.R2, "a")}
+    assert h.b not in sch.nets
+    check_invariants(d)
+    assert sch.pin_to_net == recompute_index(sch)  # sanity check
+
+
+def test_merge_with_self_is_noop() -> None:
+    d, sch, h = two_nets_to_merge()
+    before = pins_on_net(sch, h.a)  # actual state
+    merge_nets(d, sch, h.a, h.a)  # fuse net to itself
+    assert pins_on_net(sch, h.a) == before
+    assert h.b in sch.nets  # b still exists too so nothing merged
+    check_invariants(d)
+
+
+def test_merge_rejects_unknown_net() -> None:
+    d, sch, h = two_nets_to_merge()
+    with pytest.raises(ValueError):
+        merge_nets(d, sch, h.a, NetId(99999))
+
+
+def test_merge_keeps_pins_queryable() -> None:
+    d, sch, h = two_nets_to_merge()
+    merge_nets(d, sch, h.a, h.b)
+    # instances_on_net still works for the merged net
+    assert instances_on_net(sch, h.a) == {h.R1, h.R2}

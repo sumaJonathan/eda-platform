@@ -44,3 +44,7 @@ warn_unused_ignores = true
 # everything, which would drown the current scaffold in noise:
 # disallow_untyped_defs = true
 # strict = true
+
+[[tool.mypy.overrides]]
+module = ["hypothesis.*"]
+ignore_missing_imports = true
