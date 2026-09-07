@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "next_id": 13,
+  "top": 7,
+  "library": [
+    {
+      "name": "resistor",
+      "id": 1,
+      "pins": [
+        {"name": "b", "id": 3, "direction": "passive"},
+        {"name": "a", "id": 2, "direction": "passive"}
+      ],
+      "views": []
+    },
+    {
+      "name": "vsource",
+      "id": 4,
+      "pins": [
+        {"name": "p", "id": 5, "direction": "passive"},
+        {"name": "n", "id": 6, "direction": "passive"}
+      ],
+      "views": []
+    },
+    {
+      "name": "divider",
+      "id": 7,
+      "pins": [],
+      "views": [
+        ["schematic", {
+          "owner": 7,
+          "nets": [
+            {"id": 11, "name": "vin", "pins": [[8, 5], [9, 2]]},
+            {"id": 12, "name": "out", "pins": [[9, 3], [10, 2]]},
+            {"id": 13, "name": "gnd", "pins": [[8, 6], [10, 3]]}
+          ],
+          "instances": [
+            {"id": 8, "name": "V1", "cell": 4, "params": {}},
+            {"id": 9, "name": "R1", "cell": 1, "params": {}},
+            {"id": 10, "name": "R2", "cell": 1, "params": {}}
+          ],
+          "port_map": []
+        }]
+      ]
+    }
+  ]
+}

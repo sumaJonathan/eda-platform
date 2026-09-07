@@ -16,6 +16,7 @@ import pytest
 from eda_proto.ids import CellId, InstancePin, NetId, PinId
 from eda_proto.invariants import (
     _check_cells_resolve,
+    _check_counter_covers_ids,
     _check_index_is_inverse,
     _check_instances_resolve,
     _check_names_unique,
@@ -327,6 +328,15 @@ def test_inv9_anonymous_nets_are_not_duplicates() -> None:
         anon = Net(id=d.new_net_id(), name=None, pins=set())
         h.view.nets[anon.id] = anon
     assert _check_names_unique(d) == []
+
+
+# --------------------------------------------------------------------------
+# INV 10 --
+# --------------------------------------------------------------------------
+def test_inv10_counter_below_max_id() -> None:
+    d, h = make_divider()
+    d._next_id = 2  # far below the ids actually in use
+    assert len(_check_counter_covers_ids(d)) == 1
 
 
 # --------------------------------------------------------------------------

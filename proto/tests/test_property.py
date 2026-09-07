@@ -21,6 +21,7 @@ from eda_proto.ops import (
     split_net,
 )
 from eda_proto.oracle import recompute_index
+from eda_proto.serialize import design_from_dict, design_to_dict, designs_equal
 from tests.helpers import scaffold
 
 
@@ -113,6 +114,10 @@ class NetlistMachine(RuleBasedStateMachine):
     def stays_consistent(self) -> None:
         check_invariants(self.d)
         assert self.sch.pin_to_net == recompute_index(self.sch)
+
+    @invariant()
+    def survuves_serialization_roundtrip(self) -> None:
+        assert designs_equal(design_from_dict(design_to_dict(self.d)), self.d)
 
     @invariant()
     def bookkeeping_matches_truth(self) -> None:

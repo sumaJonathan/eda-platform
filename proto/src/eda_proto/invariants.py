@@ -273,6 +273,28 @@ def _check_names_unique(design) -> list[str]:
     return problems
 
 
+# INV 10: the id counter is at least as large as every id in use.
+def _check_counter_covers_ids(design) -> list[str]:
+    problems = []
+    max_seen = 0
+    for cid, cell in design.library.items():
+        max_seen = max(max_seen, cid)
+        for pid in cell.pins:
+            max_seen = max(max_seen, pid)
+        v = cell.views.get("schematic")
+        if isinstance(v, SchematicView):
+            for iid in v.instances:
+                max_seen = max(max_seen, iid)
+            for nid in v.nets:
+                max_seen = max(max_seen, nid)
+    if max_seen > design._next_id:
+        problems.append(
+            f"id counter _next_id={design._next_id} is below the largest id "
+            f"in use ({max_seen}); a new id would collide"
+        )
+    return problems
+
+
 ## ALTOGETHER: combined function call
 _CHECKS = [
     _check_cells_resolve,
@@ -284,6 +306,7 @@ _CHECKS = [
     _check_port_map,
     _check_no_cycles,
     _check_names_unique,
+    _check_counter_covers_ids,
 ]
 
 
