@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import struct
@@ -13,6 +14,15 @@ HEADER_SIZE = 9  # struct.calcsize(HEADER)
 HEADER_KEY = 0  # cell ids start at 1
 
 
+def _sync(f):
+    f.flush()  # userspace buffer->OS
+    try:
+        fd = f.fileno()
+    except (io.UnsupportedOperation, AttributeError):
+        return  # in-memory buffer, can only do flush
+    os.fsync(fd)  # OS page cache
+
+
 # ==========================================================================
 # Slice 2 + 3: In-memory index + put/get/delete
 # ==========================================================================
@@ -22,17 +32,16 @@ class LogStore:
         self.index = {}
         self._rebuild_index()  # recover on open
 
-    def close(self) -> None:
-        self.f.close()
-
-    def keys(self) -> list:
-        return list(self.index)
-
     def _rebuild_index(self) -> None:
         self.f.seek(0)  # scan from start
         while True:
             offset = self.f.tell()  # capture b4 read
-            rec = read_record(self.f)
+            try:
+                rec = read_record(self.f)
+            except ValueError:  # crash interrupted the append
+                self.f.seek(0)
+                self.f.truncate(offset)
+                break
             if rec is None:  # EOF means done
                 break
             key, payload, deleted = rec
@@ -40,6 +49,15 @@ class LogStore:
                 self.index.pop(key, None)  # remove
             else:
                 self.index[key] = offset  # exists, so set
+
+    def sync(self):
+        _sync(self.f)
+
+    def close(self) -> None:
+        self.f.close()
+
+    def keys(self) -> list:
+        return list(self.index)
 
     def put(self, key: int, payload: bytes) -> None:
         self.f.seek(0, 2)  # go to EOF
@@ -113,6 +131,7 @@ def save_design(design: Design, store: LogStore) -> None:
     for cell in design.library.values():
         payload = json.dumps(cell_to_dict(cell), sort_keys=True).encode()
         store.put(cell.id, payload)
+    store.sync()
 
 
 def load_design(store: LogStore) -> Design:
